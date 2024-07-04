@@ -6,6 +6,31 @@ This project aims to generate an enriched dataset from the PepBDB database for m
 
 The script processes peptide-protein interaction data, extracts sequences, enriches them with various biochemical features, and creates a tabular dataset suitable for further analysis with random forests, XGBoost, etc. Each row is labeled as either a binding residue (`1`) or non-binding residue (`0`).
 
+### Tabular Dataset `peppi_data.csv`:
+| AA | Protein Hydrophobicity | Protein Steric Parameter | Protein Volume | Protein Polarizability | Protein Helix Probability | Protein Beta Probability | Protein Isoelectric Point | Protein HSE Up | Protein HSE Down | Protein Pseudo Angles | Protein ASA | Protein Phi | Protein Psi | Protein SS H | Protein SS B | Protein SS E | Protein SS G | Protein SS I | Protein SS T | Protein SS S | Protein SS - | A   | R   | N   | D   | C   | Q   | E   | G   | H   | I   | L   | K   | M   | F   | P   | S   | T   | W   | Y   | V   | Binding Indices |
+|----|------------------------|--------------------------|----------------|------------------------|---------------------------|--------------------------|---------------------------|----------------|------------------|-----------------------|-------------|-------------|-------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|---------------|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|-----|----------------|
+| L  | 0.6891891891891891     | 0.9607843137254901       | 0.8222778473091366 | 0.6241610738255033     | 0.6823529411764706        | 0.7473684210526315       | 0.40175219023779735       | 0.3333333333333333 | 0.42857142857142855  | 0.8699882132974325    | 0.4456686291000842 | 0.23066692000760028 | 0.0816007154035323 | 1.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0 | 0.0 | 0.0 | 0.0 | 0.6666666666666666 | 0.0 | 0.0 | 0.0 | 0.16666666666666663 | 0.5555555555555556 | 1.0 | 0.0 | 0.5555555555555556 | 0.5 | 0.33333333333333326 | 0.0 | 0.0 | 0.25 | 0.30000000000000004 | 0.7142857142857142 | 0 |
+| K  | 0.518018018018018      | 0.6666666666666667       | 0.8610763454317898 | 0.7348993288590604     | 0.6941176470588235        | 0.25263157894736843      | 0.8723404255319149        | 0.0               | 0.5714285714285714   | 0.8747249797378288    | 0.7270984020185031 | 0.19703591107733237 | 0.09479096803040464 | 1.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.3333333333333333 | 0.4444444444444444 | 0.36363636363636365 | 0.30000000000000004 | 0.6666666666666666 | 0.5 | 0.3333333333333333 | 0.30000000000000004 | 0.5 | 0.2222222222222222 | 0.5 | 0.8571428571428571 | 0.4444444444444444 | 0.2 | 1.0 | 0.8 | 0.2857142857142857 | 0.125 | 0.2 | 0.42857142857142855 | 1 |
+| D  | 0.2072072072072072     | 0.7450980392156863       | 0.40175219023779735 | 0.3523489932885906     | 0.48235294117647065       | 0.18947368421052624      | 0.0                       | 0.0               | 0.49999999999999994 | 0.6108288105124712    | 0.7711867992384177 | 0.1911457343720312  | 0.1553767046724793 | 1.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0           | 0.0 | 0.2222222222222222 | 0.4545454545454546 | 1.0 | 0.0 | 0.375 | 0.6666666666666666 | 0.2 | 0.5 | 0.0 | 0.0 | 0.42857142857142855 | 0.0 | 0.0 | 0.6666666666666666 | 0.6000000000000001 | 0.14285714285714285 | 0.0 | 0.09999999999999998 | 0.14285714285714285 | 1 |
+
+### Image Dataset `peppi_data_imgs`:
+```bash
+peppi_data_imgs
+├── binding
+│   ├── img1.jpg
+│   ├── img2.jpg
+│   ├── img3.jpg
+│   └── ...
+└── nonbinding
+    ├── img4.jpg
+    ├── img5.jpg
+    ├── img6.jpg
+    └── ...
+
+```
+![Example of images](example.png)
+*Note: the actual images have their dimensions flipped from what is shown. This image is magnified for illustrations purposes.*
+
 ## Table of Contents
 1. [System Requirements](#system-requirements)
 2. [Data Preparation Process](#data-preparation-process)
@@ -26,12 +51,12 @@ To run this script, you will need the following:
 - [blast+](https://blast.ncbi.nlm.nih.gov/Blast.cgi?PAGE_TYPE=BlastDocs&DOC_TYPE=Download)
 - [mkdssp](https://swift.cmbi.umcn.nl/gv/dssp/)
 - [prodigy](https://github.com/haddocking/prodigy) (`pip install prodigy-prot`)
-- Python packages: pandas, numpy, biopython
+- Python packages: pandas, numpy, biopython, scikit-learn
 
 You can install the required Python packages using:
 
 ```bash
-pip install pandas numpy biopython prodigy-prot
+pip install pandas numpy biopython prodigy-prot scikit-learn
 ```
 
 You can download the PepBDB dataset from here:
@@ -235,9 +260,28 @@ tar -xzf pepbdb-20200318.tgz
 python gendata.py
 ```
 
+`gendata.py` can also generate images in the style of the [Visual](https://www.sciencedirect.com/science/article/pii/S0022519320301338?via%3Dihub) dataset. To enable this option, set the --images flag to true and specify full paths for binding and non-binding images:
+
+```bash
+python gendata.py \
+    --images True \
+    --binding_path path/to/binding \
+    --nonbinding_path path/to/nonbinding
+```
+
 IMPORTANT: Remember to modify `paths.py` with paths specific to your system.
 
 Ensure you have the necessary input files and directories as specified in the script.
+
+## Notes & Todo
+- The images directory `peppi_data_imgs.tgz` and tabular dataset `peppi_data.csv.gz` are NOT 1-1, and the CSV is not label file for the images. While they build from the same data, they do not contain the same number of records. 
+    - **811,830 records in `peppi_data.csv`**
+        - Binding: 110,268
+        - Non-binding: 701,562
+    - **806,129 images in `peppi_data_imgs`**
+        - Binding: 109,880
+        - Non-binding: 696,249
+- This is because some rows (residues) in `peppi_data.csv` have NaN values. Before exporting the CSV, these rows alone are simply dropped. However, that same faulty row/reside can appear in several images (since each image is a representation of seven contiguous resides). To maintain usability, ALL images containing that resiude are dropped. 
 
 ## Citations
 - Altschul, S.F., Madden, T.L., Schaffer, A.A., Zhang, J., Zhang, Z., Miller, W., Lipman, D.J. (1997) “Gapped BLAST and PSI-BLAST: a new generation of protein database search programs.” Nucleic Acids Res. 25:3389-3402. [PubMed](https://pubmed.ncbi.nlm.nih.gov/9254694/)

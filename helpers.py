@@ -13,6 +13,7 @@ import tempfile
 from paths import *
 from typing import List
 import warnings
+from PIL import Image
 
 def extract_sequence(pdb_filename: str) -> str:
     '''
@@ -31,7 +32,7 @@ def extract_sequence(pdb_filename: str) -> str:
                 if residue.get_resname() == 'HOH': # ignoring water
                     continue
                 if residue.get_resname() == 'UNK':
-                    sequence += 'X'  # add three 'X's for each 'UNK' residue
+                    sequence += 'X'  # add X for each 'UNK' residue
                 else:
                     sequence += seq1(residue.get_resname()) # seq1 converts 3-letter code to 1-letter code
 
@@ -239,3 +240,94 @@ def make_tabular_dataset(row: pd.Series) -> pd.DataFrame:
         print("Columns length:", len(columns))
 
     return pd.DataFrame(arr)
+
+def window_maker(sequence_array: pd.DataFrame) -> List[pd.DataFrame]:
+    '''
+    Takes a sequence array and returns a list windowed arrays by sliding a window over the input feature array. 
+    The window is centered on the residue of interest. 
+    '''
+    
+    k = 7 # window size
+    windows = []
+    sequence_array = sequence_array.T.reset_index(drop=True)
+    sequence_length = sequence_array.shape[1]
+    
+    
+    for i in range(sequence_length):
+        
+        # N-terminal case
+        if i < 3:
+            
+            right = sequence_array.iloc[:, 0:i+4]
+            
+            if i == 0:
+                left = right.iloc[:, :-4:-1]
+            elif i == 1:
+                left = right.iloc[:, 1::-1]
+            elif i == 2:
+                left = right.iloc[:, 1]
+            
+            window = pd.concat([left, right], axis = 1)
+        
+        # C-terminal case
+        elif i >= sequence_length - 3:
+            
+            left = sequence_array.iloc[:, i-3:]
+            
+            if i == sequence_length - 3:
+                right = sequence_array.iloc[:, i+1]
+            elif i == sequence_length - 2:
+                right = sequence_array.iloc[:, i-2:i].iloc[:, ::-1]
+            elif i == sequence_length - 1:
+                right = sequence_array.iloc[:, i-3:i].iloc[:, ::-1]
+            
+            window = pd.concat([left, right], axis = 1)
+        
+        # Standard case
+        else:
+            window = sequence_array.iloc[:, i-3:i+4]
+        
+        windows.append(window)
+    return windows
+
+def create_images(window: pd.DataFrame, name: str):
+    '''
+    Helper function that accepts a window DataFrame and converts it 
+    into a CNN-friendly image.
+    '''
+    window = window.T.reset_index(drop=True) # transpose the array and reset the index
+    window = window.apply(pd.to_numeric, errors='coerce') # convert to numeric
+    window = window.to_numpy() # convert to numpy array
+    window_normalized = window * 255 # scale to 0-255
+        
+    window_uint8 = window_normalized.astype('uint8')
+    img = Image.fromarray(window_uint8)
+    img.save(name)
+    print(f'\rCreated image: {name}.', end='')
+    
+def process_images(list_of_feature_arrays: List[pd.DataFrame], binding_path: str, nonbinding_path: str):
+    '''
+    Takes a list sequence feature arrays and uses create_images to turn valid ones into images
+    in the appropriate folder.
+    '''
+    os.makedirs(binding_path, exist_ok=True)
+    os.makedirs(nonbinding_path, exist_ok=True)
+    name_index = 0
+    
+    for arr in list_of_feature_arrays:
+        residues = arr.pop('AA')
+        
+        binding_indices = arr.pop('Binding Indices')
+        binding_indices = binding_indices.to_list()
+        
+        windows = window_maker(arr)
+        for i, window in enumerate(windows):
+            if not window.isna().any().any():
+                name_index += 1
+                folder = binding_path if binding_indices[i] == 1 else nonbinding_path
+                name = f'{folder}/{name_index}.jpg'
+                create_images(window, name)
+            else:
+                continue
+    print('\n')
+        
